@@ -4,6 +4,12 @@ version = "0.1.0"
 edition = "2021"
 description = "A procedural macro to include URL content as static strings at compile time"
 license = "MIT"
+authors = ["Petr Gadorek <hahihula@gmail.com>"]
+repository = "https://github.com/hahihula/include_url_macro"
+documentation = "https://docs.rs/include_url_macro"
+readme = "README.md"
+keywords = ["macro", "include", "url", "static", "compile-time"]
+categories = ["development-tools::procedural-macro-helpers"]
 
 [lib]
 proc-macro = true
