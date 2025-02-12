@@ -1,7 +1,0 @@
-error: Invalid URL: relative URL without a base
- --> tests/compile-fail/invalid_url.rs:4:20
-  |
-4 |     let _content = include_url!("not_a_url");
-  |                    ^^^^^^^^^^^^^^^^^^^^^^^^^
-  |
-  = note: this error originates in the macro `include_url` (in Nightly builds, run with -Z macro-backtrace for more info)
