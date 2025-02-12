@@ -1,5 +1,8 @@
 # include_url
 
+[![Crates.io](https://img.shields.io/crates/v/include_url_macro)](https://crates.io/crates/include_url_macro)
+[![Documentation](https://docs.rs/include_url_macro/badge.svg)](https://docs.rs/include_url_macro)
+
 A Rust procedural macro that fetches URL content at compile time and includes it as a static string. It also provides JSON parsing capabilities through the `include_json_url` macro.
 
 ## Usage
