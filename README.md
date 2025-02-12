@@ -61,7 +61,7 @@ println!("User name: {}", user.name);
 - JSON parsing capabilities:
   - Parse into generic `serde_json::Value`
   - Parse into specific Rust types that implement `serde::Deserialize`
-  - Compile-time JSON validation
+  - Compile-time JSON validation (the type does not gets validated at compile time)
 
 ## Safety
 

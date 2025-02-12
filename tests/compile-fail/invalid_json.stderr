@@ -1,0 +1,7 @@
+error: Invalid JSON content from URL: expected value at line 1 column 1
+ --> tests/compile-fail/invalid_json.rs:6:9
+  |
+6 |         include_json_url!("https://raw.githubusercontent.com/rust-lang/rust/master/COPYRIGHT");
+  |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  |
+  = note: this error originates in the macro `include_json_url` (in Nightly builds, run with -Z macro-backtrace for more info)
