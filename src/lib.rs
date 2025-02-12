@@ -19,12 +19,14 @@
 //! use serde::Deserialize;
 //!
 //! #[derive(Deserialize)]
-//! struct Config {
-//!     name: String,
-//!     version: String,
+//! struct Post {
+//!   userId: i32,
+//!   id: i32,
+//!   title: String,
+//!   body: String,
 //! }
 //!
-//! let config: Config = include_json_url!("https://example.com/config.json", Config);
+//! let post: Post = include_json_url!("https://jsonplaceholder.typicode.com/posts/1", Post);
 //! ```
 
 use proc_macro::TokenStream;
@@ -146,12 +148,14 @@ impl Parse for JsonUrlInput {
 /// use serde::Deserialize;
 ///
 /// #[derive(Deserialize)]
-/// struct Config {
-///     name: String,
-///     version: String,
+/// struct Post {
+///   userId: i32,
+///   id: i32,
+///   title: String,
+///   body: String,
 /// }
 ///
-/// let config: Config = include_json_url!("https://example.com/config.json", Config);
+/// let post: Post = include_json_url!("https://jsonplaceholder.typicode.com/posts/1", Post);
 /// ```
 ///
 /// # Errors
