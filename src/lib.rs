@@ -77,7 +77,18 @@ pub(crate) fn fetch_url_content(url_str: &str) -> Result<bytes::Bytes, String> {
         .map_err(|e| format!("Failed to read response body: {}", e))
 }
 
-pub(crate) fn cached_url_content(url_str: &str) -> Result<std::path::PathBuf, String> {
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+enum CompressKind {
+    #[default]
+    None,
+    #[cfg(feature = "brotli")]
+    Brotli,
+}
+
+pub(crate) fn cached_url_content(
+    url_str: &str,
+    compress_kind: CompressKind,
+) -> Result<std::path::PathBuf, String> {
     let out_dir = std::path::Path::new(env!("INCLUDE_URL_CACHE_DIR"));
     if !out_dir.exists() {
         std::fs::create_dir_all(out_dir)
@@ -89,6 +100,8 @@ pub(crate) fn cached_url_content(url_str: &str) -> Result<std::path::PathBuf, St
     hasher.update(crate_name.as_bytes());
     hasher.update(b"\0");
     hasher.update(url_str.as_bytes());
+    hasher.update(b"\0");
+    hasher.update(format!("{:?}", compress_kind));
     let hash = hasher.finalize();
     let filename = format!("{:x}", hash);
     let cache_file = out_dir.join(filename);
@@ -97,6 +110,24 @@ pub(crate) fn cached_url_content(url_str: &str) -> Result<std::path::PathBuf, St
     }
 
     let content = fetch_url_content(url_str)?;
+
+    let content = match compress_kind {
+        CompressKind::None => content,
+        #[cfg(feature = "brotli")]
+        CompressKind::Brotli => {
+            let mut buffer = Vec::with_capacity(4096);
+            {
+                let mut encoder = brotli::CompressorWriter::new(&mut buffer, 4096, 11, 22);
+                encoder
+                    .write_all(&content)
+                    .map_err(|e| format!("Failed to write compressed content: {}", e))?;
+                encoder
+                    .flush()
+                    .map_err(|e| format!("Failed to flush compressed content: {}", e))?;
+            }
+            bytes::Bytes::from(buffer)
+        }
+    };
 
     let mut file = OpenOptions::new()
         .write(true)
@@ -131,7 +162,7 @@ pub(crate) fn cached_url_content(url_str: &str) -> Result<std::path::PathBuf, St
 pub fn include_url(input: TokenStream) -> TokenStream {
     let url_str = parse_macro_input!(input as LitStr).value();
 
-    match cached_url_content(&url_str) {
+    match cached_url_content(&url_str, CompressKind::None) {
         Ok(path) => {
             let path_str = path.display().to_string();
             let output = quote! { include_str!(#path_str) };
@@ -147,7 +178,24 @@ pub fn include_url(input: TokenStream) -> TokenStream {
 pub fn include_url_bytes(input: TokenStream) -> TokenStream {
     let url_str = parse_macro_input!(input as LitStr).value();
 
-    match cached_url_content(&url_str) {
+    match cached_url_content(&url_str, CompressKind::None) {
+        Ok(path) => {
+            let path_str = path.display().to_string();
+            let output = quote! { include_bytes!(#path_str) };
+            output.into()
+        }
+        Err(err) => syn::Error::new(proc_macro2::Span::call_site(), err)
+            .to_compile_error()
+            .into(),
+    }
+}
+
+#[cfg(feature = "brotli")]
+#[proc_macro]
+pub fn include_url_bytes_with_brotli(input: TokenStream) -> TokenStream {
+    let url_str = parse_macro_input!(input as LitStr).value();
+
+    match cached_url_content(&url_str, CompressKind::Brotli) {
         Ok(path) => {
             let path_str = path.display().to_string();
             let output = quote! { include_bytes!(#path_str) };
@@ -226,7 +274,7 @@ pub fn include_json_url(input: TokenStream) -> TokenStream {
     let JsonUrlInput { url, ty } = parse_macro_input!(input as JsonUrlInput);
     let url_str = url.value();
 
-    match cached_url_content(&url_str) {
+    match cached_url_content(&url_str, CompressKind::None) {
         Ok(path) => {
             let content = match std::fs::read_to_string(path)
                 .map_err(|e| format!("Failed to open cache file: {}", e))

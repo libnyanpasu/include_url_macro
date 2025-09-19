@@ -11,6 +11,10 @@ readme = "README.md"
 keywords = ["macro", "include", "url", "static", "compile-time"]
 categories = ["development-tools::procedural-macro-helpers"]
 
+[features]
+default = ["brotli"]
+brotli = ["dep:brotli"]
+
 [lib]
 proc-macro = true
 
@@ -24,6 +28,7 @@ sha2 = "0.10.9"
 url = "2.4"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
+brotli = { version = "8.0.2", optional = true }
 
 [dev-dependencies]
 trybuild = "1.0.103"

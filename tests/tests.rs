@@ -1,12 +1,56 @@
 #[cfg(test)]
 mod tests {
-    use include_url_macro::{include_json_url, include_url};
+    use std::io::{Read, Write};
+
+    use include_url_macro::{
+        include_json_url, include_url, include_url_bytes, include_url_bytes_with_brotli,
+    };
     use serde::Deserialize;
 
     #[test]
     fn test_include_url() {
         let content =
             include_url!("https://raw.githubusercontent.com/rust-lang/rust/master/README.md");
+        assert!(content.contains("Rust"));
+    }
+
+    #[test]
+    fn test_include_bytes() {
+        let content =
+            include_url_bytes!("https://raw.githubusercontent.com/rust-lang/rust/master/README.md");
+        let content = std::str::from_utf8(content).unwrap();
+        assert!(content.contains("Rust"));
+    }
+
+    #[test]
+    fn test_include_bytes_with_brotli() {
+        let content = include_url_bytes_with_brotli!(
+            "https://raw.githubusercontent.com/rust-lang/rust/master/README.md"
+        );
+        let mut result = Vec::with_capacity(4096);
+        {
+            let mut reader = brotli::Decompressor::new(&content[..], 4096);
+            let mut buf = [0u8; 4096];
+            loop {
+                match reader.read(&mut buf[..]) {
+                    Err(e) => {
+                        if let std::io::ErrorKind::Interrupted = e.kind() {
+                            continue;
+                        }
+                        panic!("{}", e);
+                    }
+                    Ok(size) => {
+                        if size == 0 {
+                            break;
+                        }
+                        if let Err(e) = result.write_all(&buf[..size]) {
+                            panic!("{}", e)
+                        }
+                    }
+                }
+            }
+        }
+        let content = std::str::from_utf8(&result).unwrap();
         assert!(content.contains("Rust"));
     }
 
