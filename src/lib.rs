@@ -1,3 +1,5 @@
+#![feature(proc_macro_tracked_env)]
+
 //! A procedural macro crate for including URL content as static strings at compile time.
 //!
 //! This crate provides two main macros:
@@ -29,9 +31,12 @@
 //! let post: Post = include_json_url!("https://jsonplaceholder.typicode.com/posts/1", Post);
 //! ```
 
+use std::{fs::OpenOptions, io::Write};
+
 use proc_macro::TokenStream;
 use quote::quote;
 use reqwest::blocking::Client;
+use sha2::{Digest, Sha256};
 use syn::{parse::Parse, parse::ParseStream, parse_macro_input, LitStr, Token, Type};
 use url::Url;
 
@@ -50,7 +55,7 @@ use url::Url;
 ///
 /// This function only supports HTTP and HTTPS URLs to prevent potential security issues
 /// with other URL schemes.
-pub(crate) fn fetch_url_content(url_str: &str) -> Result<String, String> {
+pub(crate) fn fetch_url_content(url_str: &str) -> Result<bytes::Bytes, String> {
     // Validate URL
     let url = Url::parse(url_str).map_err(|e| format!("Invalid URL: {}", e))?;
 
@@ -68,8 +73,41 @@ pub(crate) fn fetch_url_content(url_str: &str) -> Result<String, String> {
         .map_err(|e| format!("Failed to fetch URL: {}", e))?;
 
     response
-        .text()
+        .bytes()
         .map_err(|e| format!("Failed to read response body: {}", e))
+}
+
+pub(crate) fn cached_url_content(url_str: &str) -> Result<std::path::PathBuf, String> {
+    let out_dir = std::path::Path::new(env!("INCLUDE_URL_CACHE_DIR"));
+    if !out_dir.exists() {
+        std::fs::create_dir_all(out_dir)
+            .map_err(|e| format!("Failed to create cache directory: {}", e))?;
+    }
+    let crate_name =
+        proc_macro::tracked_env::var("CARGO_PKG_NAME").unwrap_or_else(|_| "unknown".into());
+    let mut hasher = Sha256::new();
+    hasher.update(crate_name.as_bytes());
+    hasher.update(b"\0");
+    hasher.update(url_str.as_bytes());
+    let hash = hasher.finalize();
+    let filename = format!("{:x}", hash);
+    let cache_file = out_dir.join(filename);
+    if cache_file.exists() {
+        return Ok(cache_file);
+    }
+
+    let content = fetch_url_content(url_str)?;
+
+    let mut file = OpenOptions::new()
+        .write(true)
+        .create(true)
+        .truncate(true)
+        .open(&cache_file)
+        .map_err(|e| format!("Failed to open cache file: {}", e))?;
+
+    file.write_all(&content)
+        .map_err(|e| format!("Failed to write cache file: {}", e))?;
+    Ok(cache_file)
 }
 
 /// A procedural macro that includes content from a URL as a static string at compile time.
@@ -93,9 +131,26 @@ pub(crate) fn fetch_url_content(url_str: &str) -> Result<String, String> {
 pub fn include_url(input: TokenStream) -> TokenStream {
     let url_str = parse_macro_input!(input as LitStr).value();
 
-    match fetch_url_content(&url_str) {
-        Ok(content) => {
-            let output = quote! { #content };
+    match cached_url_content(&url_str) {
+        Ok(path) => {
+            let path_str = path.display().to_string();
+            let output = quote! { include_str!(#path_str) };
+            output.into()
+        }
+        Err(err) => syn::Error::new(proc_macro2::Span::call_site(), err)
+            .to_compile_error()
+            .into(),
+    }
+}
+
+#[proc_macro]
+pub fn include_url_bytes(input: TokenStream) -> TokenStream {
+    let url_str = parse_macro_input!(input as LitStr).value();
+
+    match cached_url_content(&url_str) {
+        Ok(path) => {
+            let path_str = path.display().to_string();
+            let output = quote! { include_bytes!(#path_str) };
             output.into()
         }
         Err(err) => syn::Error::new(proc_macro2::Span::call_site(), err)
@@ -171,8 +226,18 @@ pub fn include_json_url(input: TokenStream) -> TokenStream {
     let JsonUrlInput { url, ty } = parse_macro_input!(input as JsonUrlInput);
     let url_str = url.value();
 
-    match fetch_url_content(&url_str) {
-        Ok(content) => {
+    match cached_url_content(&url_str) {
+        Ok(path) => {
+            let content = match std::fs::read_to_string(path)
+                .map_err(|e| format!("Failed to open cache file: {}", e))
+            {
+                Ok(content) => content,
+                Err(e) => {
+                    return syn::Error::new(proc_macro2::Span::call_site(), e)
+                        .to_compile_error()
+                        .into()
+                }
+            };
             match serde_json::from_str::<serde_json::Value>(&content) {
                 Ok(_) => {
                     // JSON is valid, proceed with the original logic
