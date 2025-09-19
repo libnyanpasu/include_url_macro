@@ -22,7 +22,15 @@ proc-macro = true
 syn = { version = "2.0", features = ["full"] }
 quote = "1.0"
 proc-macro2 = "1.0"
-reqwest = { version = "0.11", features = ["blocking"] }
+reqwest = { version = "0.12", default-features = false, features = [
+    "charset",
+    "http2",
+    "system-proxy",
+    "json",
+    "stream",
+    "rustls-tls",
+    "blocking",
+] }
 bytes = "1"
 sha2 = "0.10.9"
 url = "2.4"

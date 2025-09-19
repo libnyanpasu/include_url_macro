@@ -37,6 +37,7 @@ use proc_macro::TokenStream;
 use quote::quote;
 use reqwest::blocking::Client;
 use sha2::{Digest, Sha256};
+use std::env;
 use syn::{parse::Parse, parse::ParseStream, parse_macro_input, LitStr, Token, Type};
 use url::Url;
 
