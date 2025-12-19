@@ -1,5 +1,3 @@
-#![feature(proc_macro_tracked_env)]
-
 //! A procedural macro crate for including URL content as static strings at compile time.
 //!
 //! This crate provides two main macros:
@@ -95,8 +93,7 @@ pub(crate) fn cached_url_content(
         std::fs::create_dir_all(out_dir)
             .map_err(|e| format!("Failed to create cache directory: {}", e))?;
     }
-    let crate_name =
-        proc_macro::tracked_env::var("CARGO_PKG_NAME").unwrap_or_else(|_| "unknown".into());
+    let crate_name = env::var("CARGO_PKG_NAME").unwrap_or_else(|_| "unknown".into());
     let mut hasher = Sha256::new();
     hasher.update(crate_name.as_bytes());
     hasher.update(b"\0");
